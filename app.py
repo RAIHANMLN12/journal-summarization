@@ -15,8 +15,8 @@ def load_model(model_path):
 # Model Options
 # =========================
 model_options = {
-    "Model Pertama": "D:/Skripsi/codingan/deployment/model_jurnal_ilmu_sosial_ketiga",
-    "Model Kedua":   "D:/Skripsi/codingan/deployment/model_jurnal_gabungan_ketiga",
+    "Model Pertama": "/model_jurnal_ilmu_sosial_ketiga",
+    "Model Kedua":   "/model_jurnal_gabungan_ketiga",
 }
 
 # =========================
