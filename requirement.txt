@@ -1,4 +1,5 @@
 streamlit
 time
+transformers
 AutoTokenizer
 AutoModelForSeq2SeqLM
