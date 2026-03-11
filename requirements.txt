@@ -3,3 +3,7 @@ transformers
 torch
 sentencepiece
 protobuf
+easyocr
+pdf2image
+PyMuPDF
+Pillow
