@@ -1,57 +1,82 @@
 import streamlit as st
 import time
+import fitz
+import easyocr
+import torch
+
+from pdf2image import convert_from_bytes
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
+
 # =========================
-# Fungsi Load Model
+# Load Model
 # =========================
 @st.cache_resource
 def load_model(model_path):
+
     tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+
+    model = AutoModelForSeq2SeqLM.from_pretrained(
+        model_path
+    )
+
     return tokenizer, model
 
-# =========================
-# Model Options
-# =========================
-model_options = {
-    "Model Pertama": "./model_jurnal_ilmu_sosial_ketiga",
-    "Model Kedua":   "./model_jurnal_gabungan_ketiga",
-}
 
 # =========================
-# Streamlit Setup
+# Load OCR
 # =========================
-st.set_page_config(page_title="Ringkas Jurnal", layout="wide")
+@st.cache_resource
+def load_ocr():
+    return easyocr.Reader(['id','en'])
 
-st.title("📘 Aplikasi Ringkas Jurnal")
 
-# Session state
-if "summaries" not in st.session_state:
-    st.session_state.summaries = []
+reader = load_ocr()
 
 
 # =========================
-# Sidebar untuk pilih model
+# Smart PDF Extraction
 # =========================
-with st.sidebar:
-    st.header("⚙️ Pengaturan Model")
-    selected_model_name = st.selectbox(
-        "Pilih Model:",
-        options=list(model_options.keys())
-    )
-    selected_model_path = model_options[selected_model_name]
+def extract_text_smart(uploaded_file):
 
-    st.success(f"Model aktif: **{selected_model_name}**")
+    pdf_bytes = uploaded_file.read()
 
-# Load model sesuai pilihan
-tokenizer, model = load_model(selected_model_path)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+    text = ""
+    pages_with_text = 0
+
+    for page in doc:
+        page_text = page.get_text().strip()
+        text += page_text + "\n"
+
+        if len(page_text) > 50:
+            pages_with_text += 1
+
+    # ---------- OCR fallback ----------
+    if pages_with_text < len(doc) * 0.3:
+
+        images = convert_from_bytes(pdf_bytes)
+
+        text = ""
+
+        for img in images:
+
+            results = reader.readtext(img)
+
+            for detection in results:
+                text += detection[1] + " "
+
+            text += "\n"
+
+    return text
 
 
 # =========================
-# Fungsi Ringkas Teks Panjang
+# Chunking Summarization
 # =========================
-def summarize_long_text(text, chunk_size=512):
+def summarize_chunking(text, chunk_size=512):
+
     tokens = tokenizer.encode(text, return_tensors="pt")[0]
     total_len = len(tokens)
     summaries = []
@@ -75,59 +100,191 @@ def summarize_long_text(text, chunk_size=512):
         summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
         summaries.append(summary_text)
 
-    return " ".join(summaries)
+    # Gabungkan semua ringkasan chunk
+    final_summary = " ".join(summaries)
+
+    return final_summary
 
 
-# Format waktu
+# =========================
+# Model Options
+# =========================
+model_options = {
+    "Model Ilmu Sosial": "D:/Skripsi/codingan/deployment/model_jurnal_sosial_pertama",
+    "Model Gabungan": "D:/Skripsi/codingan/deployment/model_jurnal_gabungan_ketiga",
+}
+
+
+# =========================
+# Streamlit Setup
+# =========================
+st.set_page_config(page_title="Ringkas Jurnal", layout="wide")
+
+
+# =========================
+# Header
+# =========================
+col_title, col_model = st.columns([3,1])
+
+with col_title:
+    st.title("📘 Aplikasi Ringkas Jurnal")
+
+with col_model:
+    selected_model_name = st.selectbox(
+        "Model",
+        options=list(model_options.keys())
+    )
+
+selected_model_path = model_options[selected_model_name]
+
+
+# =========================
+# Load Model
+# =========================
+tokenizer, model = load_model(selected_model_path)
+
+
+# =========================
+# Session State
+# =========================
+if "summaries" not in st.session_state:
+    st.session_state.summaries = []
+
+if "extracted_text" not in st.session_state:
+    st.session_state.extracted_text = ""
+
+
+# =========================
+# Time Formatter
+# =========================
 def format_time(seconds):
+
     m, s = divmod(int(seconds), 60)
     h, m = divmod(m, 60)
+
     if h > 0:
         return f"{h}h {m}m {s}s"
     else:
         return f"{m}m {s}s"
 
 
-# =========================
-# Layout Utama 2 Kolom
-# =========================
-col1, col2 = st.columns([1, 1])
+status_placeholder = st.empty()
+progress_bar = st.empty()
 
+
+# =========================
+# Layout
+# =========================
+col1, col2 = st.columns([1,1])
+
+
+# =========================
+# INPUT
+# =========================
 with col1:
-    st.header("✏️ Input Jurnal")
-    sub_judul = st.text_input("Sub Judul")
-    isi_sub_judul = st.text_area("Isi Sub Judul", height=250)
 
+    st.header("✏️ Input")
+
+    input_method = st.radio(
+        "Pilih Metode Input",
+        ["Copy Paste Teks", "Upload PDF"]
+    )
+
+
+    # =========================
+    # Copy Paste
+    # =========================
+    if input_method == "Copy Paste Teks":
+
+        text_input = st.text_area(
+            "Masukkan teks jurnal",
+            height=300
+        )
+
+
+    # =========================
+    # Upload PDF
+    # =========================
+    else:
+
+        uploaded_file = st.file_uploader(
+            "Upload file PDF",
+            type=["pdf"]
+        )
+
+        if uploaded_file is not None:
+
+            if st.button("Ekstrak Teks dari PDF"):
+
+                with st.spinner("Ekstraksi teks..."):
+
+                    extracted = extract_text_smart(uploaded_file)
+
+                    st.session_state.extracted_text = extracted
+
+                st.success("Ekstraksi selesai!")
+
+        text_input = st.text_area(
+            "Teks hasil ekstraksi (bisa diedit)",
+            value=st.session_state.extracted_text,
+            height=300
+        )
+
+
+    # =========================
+    # Button Ringkas
+    # =========================
     if st.button("Ringkas"):
-        if isi_sub_judul.strip() != "":
+
+        if text_input.strip() != "":
+
+            status_placeholder.info("⏳ Sedang meringkas dokumen...")
+
             start_time = time.time()
 
-            final_summary = summarize_long_text(isi_sub_judul)
+            final_summary = summarize_chunking(text_input)
+
+            status_placeholder.success("✅ Ringkasan selesai dibuat!")
 
             elapsed = time.time() - start_time
+
             formatted_time = format_time(elapsed)
 
-            # Hitung pengurangan
-            original_len = len(isi_sub_judul.split())
+            original_len = len(text_input.split())
             summary_len = len(final_summary.split())
-            reduction_percent = round((1 - summary_len / original_len) * 100, 2)
 
-            # Simpan hasil
-            st.session_state.summaries.append(
-                (sub_judul, final_summary, reduction_percent, formatted_time, selected_model_name)
+            reduction_percent = round(
+                (1 - summary_len / original_len) * 100,
+                2
             )
 
-            sub_judul = ""
-            isi_sub_judul = ""
+            st.session_state.summaries.append(
+                (
+                    final_summary,
+                    reduction_percent,
+                    formatted_time,
+                    selected_model_name
+                )
+            )
 
 
+# =========================
+# OUTPUT
+# =========================
 with col2:
+
     st.header("📄 Hasil Ringkasan")
 
-    for i, (judul, ringkas, reduction, waktu, model_used) in enumerate(st.session_state.summaries):
-        st.subheader(f"{judul}  —  _(Model: {model_used})_")
+    status_placeholder = st.empty()
+
+    for i, (ringkas, reduction, waktu, model_used) in enumerate(st.session_state.summaries):
+
+        st.subheader(f"Model: {model_used}")
+
         st.write(ringkas)
 
-        st.info(f"**{reduction}% pengurangan** — waktu proses **{waktu}**")
+        st.info(
+            f"**{reduction}% pengurangan** — waktu proses **{waktu}**"
+        )
 
         st.button("Copy", key=f"copy_{i}")
