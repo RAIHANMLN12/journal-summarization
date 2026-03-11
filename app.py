@@ -110,8 +110,8 @@ def summarize_chunking(text, chunk_size=512):
 # Model Options
 # =========================
 model_options = {
-    "Model Ilmu Sosial": "D:/Skripsi/codingan/deployment/model_jurnal_sosial_pertama",
-    "Model Gabungan": "D:/Skripsi/codingan/deployment/model_jurnal_gabungan_ketiga",
+    "Model Ilmu Sosial": "./model_jurnal_sosial_pertama",
+    "Model Gabungan": "./model_jurnal_gabungan_ketiga",
 }
 
 
