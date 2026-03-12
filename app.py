@@ -260,7 +260,7 @@ with col1:
                 st.success("Ekstraksi selesai!")
 
         text_input = st.text_area(
-            "Teks hasil ekstraksi (bisa diedit)",
+            "Teks hasil ekstraksi (edit untuk memperbaiki)",
             value=st.session_state.extracted_text,
             height=300
         )
