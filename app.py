@@ -8,6 +8,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
+import uuid
 
 
 # =========================
@@ -322,6 +323,7 @@ with col2:
         )
 
         col_copy, col_export = st.columns(2)
+        unique_id = uuid.uuid4().hex[:6]
 
         with col_copy:
             st.button("Copy", key=f"copy_{i}")
@@ -338,7 +340,7 @@ with col2:
             st.download_button(
                 label="Export PDF",
                 data=pdf_file,
-                file_name=f"ringkasan_{i}.pdf",
+                file_name=f"ringkasan_{unique_id}.pdf",
                 mime="application/pdf",
                 key=f"export_{i}"
             )
