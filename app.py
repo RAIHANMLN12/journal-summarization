@@ -183,7 +183,6 @@ def create_summary_pdf(summary_text, model_name, reduction, time_used):
     story.append(Paragraph("Ringkasan Jurnal", styles['Title']))
     story.append(Spacer(1,20))
 
-    story.append(Paragraph(f"<b>Model:</b> {model_name}", styles['Normal']))
     story.append(Paragraph(f"<b>Pengurangan:</b> {reduction}%", styles['Normal']))
     story.append(Paragraph(f"<b>Waktu Proses:</b> {time_used}", styles['Normal']))
 
