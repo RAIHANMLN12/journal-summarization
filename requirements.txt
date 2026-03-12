@@ -7,3 +7,4 @@ easyocr
 pdf2image
 PyMuPDF
 Pillow
+reportlab

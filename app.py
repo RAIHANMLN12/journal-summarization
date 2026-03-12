@@ -3,9 +3,11 @@ import time
 import fitz
 import easyocr
 import torch
-
 from pdf2image import convert_from_bytes
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 
 
 # =========================
@@ -168,6 +170,39 @@ def format_time(seconds):
         return f"{m}m {s}s"
 
 
+# =========================
+# Export Summary to PDF
+# =========================
+def create_summary_pdf(summary_text, model_name, reduction, time_used):
+
+    buffer = BytesIO()
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph("Ringkasan Jurnal", styles['Title']))
+    story.append(Spacer(1,20))
+
+    story.append(Paragraph(f"<b>Model:</b> {model_name}", styles['Normal']))
+    story.append(Paragraph(f"<b>Pengurangan:</b> {reduction}%", styles['Normal']))
+    story.append(Paragraph(f"<b>Waktu Proses:</b> {time_used}", styles['Normal']))
+
+    story.append(Spacer(1,20))
+
+    paragraphs = summary_text.split("\n")
+
+    for p in paragraphs:
+        story.append(Paragraph(p, styles['BodyText']))
+        story.append(Spacer(1,10))
+
+    doc = SimpleDocTemplate(buffer)
+    doc.build(story)
+
+    buffer.seek(0)
+
+    return buffer
+
+
 status_placeholder = st.empty()
 progress_bar = st.empty()
 
@@ -287,4 +322,24 @@ with col2:
             f"**{reduction}% pengurangan** — waktu proses **{waktu}**"
         )
 
-        st.button("Copy", key=f"copy_{i}")
+        col_copy, col_export = st.columns(2)
+
+        with col_copy:
+            st.button("Copy", key=f"copy_{i}")
+
+        with col_export:
+
+            pdf_file = create_summary_pdf(
+                ringkas,
+                model_used,
+                reduction,
+                waktu
+            )
+
+            st.download_button(
+                label="Export PDF",
+                data=pdf_file,
+                file_name=f"ringkasan_{i}.pdf",
+                mime="application/pdf",
+                key=f"export_{i}"
+            )
